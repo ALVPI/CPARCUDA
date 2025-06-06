@@ -98,16 +98,27 @@ int main( void ) {
 	/*We have to subtract 1 bc if we don't have a exact division we have to force to reserve 1 block more  to cover the hold matrix */
 	
 	// Execution Configuration Parameters
+	/*Numeros de bloques por malla
+	Number of blocks per grid (nº of blocks that we are going to use when we throw the kernel)*/
 	dim3 blocksPerGrid  (block_dim, block_dim);
-	dim3 threadsPerBlock(n_block, n_block );
+
+	/*Numero de hilos que va a tener cada bloque
+	Number of threatds that a block will throw during his execution*/
+	
+	dim3 threadsPerBlock(n_block, n_block);
 	
 	// Size Required to Store the Matrix
 	size_t n_bytes = (mat_size * sizeof(float));
 	
 	// Allocate Pinned Host Memory
+	/*Pointers explanation-> every pointer is in the CPU
+	-h_A the memory zone where is store the A matrix
+	-h_B the memory zone where is store the B matrix
+	-h_C the memory zone where is store the C matrix
+	-h_R the memory zone where is store the result matrix */
 	float *h_A, *h_B, *h_C, *h_R;
+	/*Malloc for have the psbly of store each matrix */
 	
-	// COMPLETAR...
 	
 	// Initialize Host Data
 	srand(123);

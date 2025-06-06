@@ -1,3 +1,7 @@
+/* Grupo G11:
+	Santiago Gonzalez Rodriguez 
+	Alvar Lopez Primo
+*/
 
 
 /*
@@ -17,8 +21,24 @@
 //
 ///////////////////////////////////////////////////////////////////////////////
 __global__ void scalarProd(float *C, const float *A, const float *B, int nElem) {
+	/*Declaration zone:*/
+	/*So, for the thread id inside the grid i need:
+		- thread_Idx.x = index of the thread inside his block.
+		- block_idx.x = index of the block (the block of threads) inside the grid (the number of blocks that we have)
+		- blockDim.x = the number of threads inside the block
+		-*/
+	int threadIdGrid = thread_Idx.x + block_idx.x * blockDim.x;
+	/*The shared memory btw threads that we are going to use to store the partial results*/
+	extern __shared__ float sharedMem[];
+	/* We need to store that partial results in this variable*/
+	float thread_sum_result = 0.0f;
+	/*Calculations*/
+	if(threadIdGrid < nElem)
+	{
+		/**6 */
+		thread_sum_result = A[threadIdGrid] * B [threadIdGrid];
+	}
 
-	// COMPLETAR...
 }
 
 /////////////////////////////////////////////////////////////////
@@ -63,19 +83,20 @@ int main( void ) {
 	int block_dim = SEGMENT_SIZE;
 	
 	// Number of Blocks
-	int n_block = ( n_elem % block_dim == 0 ) // COMPLETAR...
+	//int n_block = ( n_elem % block_dim == 0 ) // COMPLETAR...
+	int n_block = (n_elem + block_dim -1) / block_dim;
 	
 	// Execution Configuration Parameters
-	dim3 blocks ( // COMPLETAR... );
-	dim3 threads( // COMPLETAR... );
+	dim3 blocks (n_block, n_block);
+	dim3 threads(block_dim, block_dim);
 	
 	// Size (in bytes) Required to Store the Matrix
 	size_t n_bytes = (n_elem * sizeof(float));
 	
 	// Allocate Host Memory
-	float *h_A = (float *) malloc( // COMPLETAR... );
-	float *h_B = (float *) malloc( // COMPLETAR... );
-	float *h_R = (float *) malloc( // COMPLETAR... );
+	float *h_A = (float *) malloc( &h_A, n_bytes );
+	float *h_B = (float *) malloc( &h_B, n_bytes );
+	float *h_R = (float *) malloc( &h_R, n_bytes );
 		
 	// Initialize Host Data
 	srand(123);
@@ -93,11 +114,18 @@ int main( void ) {
 	cudaEvent_t start, stop;
 	
 	// Allocate Device Memory
+	/*Here im going to explain wich is the function of this pointers on the code*/
+	/*d_A the direction where the device will store the first matrix
+	Same for the other ones
+	d_C is used for store the partial result
+	d_R is used for strore the final result*/
 	float *d_A, *d_B, *d_C, *d_R;
-	cudaMalloc((void **)&d_A, // COMPLETAR... );
-	cudaMalloc((void **)&d_B, // COMPLETAR... );
-	cudaMalloc((void **)&d_C, // COMPLETAR... );
-	cudaMalloc((void **)&d_R, // COMPLETAR... );
+
+	/*We just have to have the enougth mem to store the elements of the matrix result */
+	cudaMalloc((void **)&d_A, sizeof(float)*n_elem);
+	cudaMalloc((void **)&d_B, sizeof(float)*n_elem);
+	cudaMalloc((void **)&d_C, sizeof(float)*n_elem);
+	cudaMalloc((void **)&d_R, sizeof(float)*n_elem);
 	
 	// Init Events
 	cudaEventCreate(&start);
@@ -107,16 +135,25 @@ int main( void ) {
     cudaEventRecord(start, 0);
 	
 	// Copy Host Data to Device
-	
-	// COMPLETAR...
+	/*Here i have to use cudaMemCpy->cudaMemcpy(destination, source, size, cudaMemcpyDirection);*/
+	/*So here i just cpy the matrix into the graphic and we dont have to syncronyze bc cpy is a blocking op  */
+	cudaMemcpy(d_A, h_A, n_bytes, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_B, h_B, n_bytes, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_C, h_C, n_bytes, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_R, h_R, n_bytes, cudaMemcpyHostToDevice);
 
-	scalarProd<<< // COMPLETAR... >>>(d_C, d_A, d_B, n_elem);
+	/*Here we invoke the function for calculate de scalarProduct
+	scalarProd<<<numberOfBlocks, Block Dimension>>>(RESULT,MATRIX1, MATRIXB, numberOfElements); */
+	scalarProd<<<n_block, block_dim>>>(d_C, d_A, d_B, n_elem);
 	cudaDeviceSynchronize();
-	vectorReduce<<< // COMPLETAR...(teniendo en cuenta memoria shared) >>>(d_R, d_C, n_elem);
+	/*vectorReduce<<<NumberOfBlock, block_dim, size of the shared memory)>>>(Result, source, n_element);*/
+	vectorReduce<<<1, block_dim, block_dim*sizeof(float) >>>(d_R, d_C, n_elem);
 	
 	// Copy Device Data to Host
-    
-	// COMPLETAR...
+	/*Here i have to use cudaMemCpy->cudaMemcpy(destination, source, size, cudaMemcpyDeviceToHost);*/
+	cuda_memcpy(h_R, d_R, n_bytes, cudaMemcpyDeviceToHost)
+	
+	
 	
 	// End Time Measurement
 	cudaEventRecord(stop, 0);

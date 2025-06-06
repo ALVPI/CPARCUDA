@@ -1,3 +1,7 @@
+/* Grupo G11:
+	Santiago Gonzalez Rodriguez 
+	Alvar Lopez Primo
+*/
 
 
 /*
