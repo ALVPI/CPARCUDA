@@ -1,4 +1,7 @@
-
+/* Grupo G11:
+	Santiago Gonzalez Rodriguez 
+	Alvar Lopez Primo
+*/
 
 /**
  * Matrix Multiplication: C = A * B.
@@ -75,21 +78,28 @@ float randFloat(float low, float high) {
 int main( void ) {
 
 	// Matrix Dimensions
-	int dim_x = MATRIX_DIM;
-	int dim_y = dim_x;
+	int dim_x = MATRIX_DIM; //(32 )
+	int dim_y = dim_x; /*With this we get a square matrix  */
 	
 	// Matrix Size
 	int mat_size = dim_x * dim_y;
 	
 	// Block Dimension
-	int block_dim = SEGMENT_SIZE;
+	/*Is the size of the information that a block can handle (number of threats in other words)  */
+	int block_dim = SEGMENT_SIZE;//(64)
 	
 	// Number of Blocks
-	int n_block = ( dim_x % block_dim == 0 ) // COMPLETAR...
+	/*Here we have to calculate the number of blocks that we need to divide the matrix
+	We've to use the dimension of the matrix to know the number of blocks
+	So we have, the dim_x (rows) + the number of threads the hold thing that is our worksize
+	and we divide it btw the number of threats per block */
+	
+	int n_block = (dim_x + block_dim -1) / block_dim; 	
+	/*We have to subtract 1 bc if we don't have a exact division we have to force to reserve 1 block more  to cover the hold matrix */
 	
 	// Execution Configuration Parameters
-	dim3 blocksPerGrid  ( // COMPLETAR... );
-	dim3 threadsPerBlock( // COMPLETAR... );
+	dim3 blocksPerGrid  (block_dim, block_dim);
+	dim3 threadsPerBlock(n_block, n_block );
 	
 	// Size Required to Store the Matrix
 	size_t n_bytes = (mat_size * sizeof(float));
