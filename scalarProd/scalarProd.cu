@@ -30,14 +30,47 @@ __global__ void scalarProd(float *C, const float *A, const float *B, int nElem) 
 	int threadIdGrid = thread_Idx.x + block_idx.x * blockDim.x;
 	/*The shared memory btw threads that we are going to use to store the partial results*/
 	extern __shared__ float sharedMem[];
-	/* We need to store that partial results in this variable*/
+	/* We need to store that partial results in this variable bc we have to add each partial sum (thread_sum_result) */
 	float thread_sum_result = 0.0f;
 	/*Calculations*/
 	if(threadIdGrid < nElem)
 	{
-		/**6 */
+		/*store the product of the element into the variable that is local for each thread */
 		thread_sum_result = A[threadIdGrid] * B [threadIdGrid];
 	}
+	/*Here we have to store the sum result in the thread index position because is just the prooduct of index X in bouth matrix */
+	sharedMem[threadId.x] = thread_sum_result;
+	/*We must synchornize the threads to get sure that all the threats've finished their calculatons*/
+	__syncthreads();
+	/* Here we have to reduce the partials sums into the 0 position of the shared mem btw threads bc this thread will dump the results into the global mem*/
+
+	/*Secuential mode*/
+	for (int i = 1; i< blockDim.x; i++)
+	{
+		shareadMem[threadId.x] += sharedMem[i];
+		__syncthreads();
+	}
+	/*This is the binary mode for the reduction
+		// We are going to use a binary reduction, bc is the easiest way of do what we need
+		//We have the "row"/2, we check that s > 0 and in each iteration we divide s/2
+		for (int s = blockDim.x / 2; s > 0; s >>= 1)
+		{
+			//This if is the key of everything, with each itearion we are going to have less threadts
+			so, we are going to have the first half of the threads as a results accumulator//
+			if(threadId.x < s)
+			{
+				sharedMem[threadId.x] += sharedMem[threadId.x + s];
+			}
+			//sync the mem bc we have to be sure that each op was done
+			__syncthreads();
+		}
+	*/
+	/* The first thread of the block is in charge of write the data into de C matrix (is like the global mem for this function)*/
+	if(threadId.x == 0)
+	{
+		C[blockId.x] = sharadMem[0];
+	}
+
 
 }
 
@@ -50,8 +83,45 @@ __global__ void vectorReduce(float *R, const float *C, int nElem)
 {
 	// Array in Shared Memory
     extern __shared__ float sdata[];
-	
-	// COMPLETAR...
+	/*For this part we need have bouth id the local in the block (threadLocalID) and the id on the grid (threadGlobalID) bc
+	we have to paralelze the data and cpy from the local mem to the global mem (o surprise the C MATRIX)*/
+	int threadLocalId = threadId.x;
+	int threadGlobalId = threadId.x + blockId.x*blockDim.x;
+	/*Dump the data from the C matrix into the shared memory we do this for efficency, is fastest access into the shared memory that have to acces into a matrix*/
+	if(threadGlobalId< neElem)
+	{
+		sdata[threadLocalId] = C[threadGlobalId];
+	}
+	/*Sync bc we have to be sure that each thread dump the data into the shared mem*/
+	__syncthreads();
+	/*Secuential mode*/
+	for (int i = 1; i< blockDim.x; i++)
+	{
+		sdata[threadLocalId] += sdata[i];
+		__syncthreads();
+	}
+	/*This is the binary mode for the reduction
+		// We are going to use a binary reduction, bc is the easiest way of do what we need
+		//We have the "row"/2, we check that s > 0 and in each iteration we divide s/2
+		for (int s = blockDim.x / 2; s > 0; s >>= 1)
+		{
+			//This if is the key of everything, with each itearion we are going to have less threadts
+			so, we are going to have the first half of the threads as a results accumulator//
+			if(threadLocalId < s)
+			{
+				sharedMem[threadLocalId] += sharedMem[threadLocalId + s];
+			}
+			//sync the mem bc we have to be sure that each op was done
+			__syncthreads();
+		}
+	*/
+	/* The first thread of the block is in charge of write the data into de C matrix (is like the global mem for this function)*/
+	if(threadLocalId == 0)
+	{
+		R[blockIdx.x] = sdata[0];
+	}
+
+
 }
 
 // -----------------------------------------------
