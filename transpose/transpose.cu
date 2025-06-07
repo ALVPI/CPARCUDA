@@ -26,21 +26,13 @@ __global__ void transposeMatrix(float *d_data, int mat_dim) {
 	// Array in Shared Memory
 	extern __shared__ float sdata[];
 	
-	int tid_b = // COMPLETAR...
-	int tid_g = // COMPLETAR...
-	
+	int tid_b = threadx.x;
+	int tid_g = threadx.x + blockIdx.x * blockDim.x;
 	for (int i=0; i < blockDim.x; i++) {
-		sdata[// COMPLETAR...] = d_data[// COMPLETAR...];
+		sdata[tid_b] = d_data[tid_g];
 	}
 	
 	__syncthreads();
-	
-	tid_b = // COMPLETAR...
-	tid_g = // COMPLETAR...
-	
-	for (int i=0; i < blockDim.x; i++) {
-		d_data[// COMPLETAR...] = sdata[// COMPLETAR...];
-	}
 }
 
 // ---------------------
@@ -78,11 +70,10 @@ int main( void ) {
 	int block_dim = SEGMENT_SIZE;
 	
 	// Number of Blocks
-	int n_block = ( dim_x % block_dim == 0 ) // COMPLETAR...
-	
+	int n_block = (dim_x + block_dim -1) / block_dim; 	
 	// Execution Configuration Parameters
-	dim3 blocksPerGrid  ( // COMPLETAR... );
-	dim3 threadsPerBlock( // COMPLETAR... );
+	dim3 blocksPerGrid  (n_block, n_block);
+	dim3 threadsPerBlock(block_dim, block_dim);
 	
 	// Size (in bytes) Required to Store the Matrix
 	size_t n_bytes = (dim_x * dim_y * sizeof(float));
@@ -107,9 +98,9 @@ int main( void ) {
 	float kernel_time, kernel_bandwidth;
 	
 	// Allocate Device Memory
-
-	// COMPLETAR...
-
+	float *device_A, *device_AT;
+	cudaMalloc((void**)&device_A, n_bytes);
+	cudaMalloc((void**)&device_AT,n_bytes);
 	// Init Events
 	cudaEventCreate(&start);
 	cudaEventCreate(&stop );
@@ -118,14 +109,14 @@ int main( void ) {
     cudaEventRecord(start, 0);
 	
 	// Copy Host Data to Device
+	cudaMemcpy(device_A, A, n_bytes, cudaMemcpyHostToDevice);
 	
-	// COMPLETAR...	
 	
-    transposeMatrix<<< // COMPLETAR...(teniendo en cuenta memoria shared) >>>(d_data, dim_x);
-	
+    transposeMatrix<<<n_block, block_dim, block_dim*sizeof(float) >>>(d_data, dim_x);
+	cudaDeviceSynchronize();
 	// Copy Device Data to Host
 	
-	// COMPLETAR...
+	cudaMemCpy(h_Aux, device_A, n_bytes, cudaMemcpyDeviceToHost);
     
 	// End Time Measurement
 	cudaEventRecord(stop, 0);
