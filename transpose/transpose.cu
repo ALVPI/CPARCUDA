@@ -105,8 +105,8 @@ int main( void ) {
 	
 	// Allocate Device Memory
 	float *device_A, *device_AT;
-	cudaMalloc((void**)&device_A, n_bytes);
-	cudaMalloc((void**)&device_AT,n_bytes);
+	cudaMalloc((void**)&device_A, dim_x * dim_y);
+	cudaMalloc((void**)&device_AT,dim_x * dim_y);
 	// Init Events
 	cudaEventCreate(&start);
 	cudaEventCreate(&stop );
@@ -118,11 +118,11 @@ int main( void ) {
 	cudaMemcpy(device_A, A, n_bytes, cudaMemcpyHostToDevice);
 	
 	
-    transposeMatrix<<<n_block, block_dim, block_dim*sizeof(float) >>>(d_data, dim_x);
+    transposeMatrix<<<n_block, block_dim, block_dim*sizeof(float) >>>(device_A, dim_x);
 	cudaDeviceSynchronize();
 	// Copy Device Data to Host
 	
-	cudaMemCpy(h_Aux, device_A, n_bytes, cudaMemcpyDeviceToHost);
+	cudaMemCpy(Aux, device_A, n_bytes, cudaMemcpyDeviceToHost);
     
 	// End Time Measurement
 	cudaEventRecord(stop, 0);
