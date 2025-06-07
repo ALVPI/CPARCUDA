@@ -29,19 +29,27 @@ __global__ void transposeMatrix(float *d_data, int mat_dim) {
 	/*tid_g is the index of the thread in the global memory*/
 	int tid_b = threadIdx.x;
 	int tid_g = threadIdx.x + blockIdx.x * blockDim.x;
-	/*In this case we dump the data from the global memory into the local bc we have to calculate in the local memory de index in the transpose matrix*/
-
-	sdata[tid_b] = d_data[tid_g];
-	
+	/*This are the index of out cell in the GLOBAL MEMORY*/
+	/*Pues de puta madre soy gilipollas y sólo dumpeo una celda de la matriz aaaaaaaaa*/
+	int i = blockIdx.x * blockDim.x + threadIdx.x;
+	int j = blockIdx.y * blockDim.y + threadIdx.y;
+	/*He are going to need this for the trans relation of the initial index*/
+    int index_in  = j * mat_dim + i;
+    int index_out = i * mat_dim + j;
+	if(x < mat_dim && j < mat_dim)
+	{
+		int local_idx = threadIdx.y * blockDim.x + threadIdx.x;
+        sdata[local_idx] = d_data[index_in];
+	}
 	__syncthreads();
 	/*Index of the element in the transpose matrix*/
 	/*A[i][j] must b A^t[j][i] that's my goal*/
-	/*So the trans index will be the block index*matrix's dimension + the local index of the thread inside of the block*/
-	int transposedIndex =  tid_b * mat_dim + blockIdx.x; 
-	/*Dump the data from the local memory into de global memory*/
-	if (tid_g < mat_dim) {
-		d_data[transposedIndex] = sdata[tid_b];
-	}
+	/*So first we need to check that our position in the original matrix is valid
+	Then we store in the matrix (the result of the transposition) position the data of the global memory of this block (for his threads)
+	sdata[Column* xDimension of the block +the local index of the thread]*/
+	if (i < mat_dim && j < mat_dim) {
+        d_data[index_out] = sdata[threadIdx.y * blockDim.x + threadIdx.x];
+    }
 }
 
 // ---------------------
