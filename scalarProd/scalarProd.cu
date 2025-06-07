@@ -13,7 +13,7 @@
 #include <stdio.h>
 
 #define N 1024
-#define SEGMENT_SIZE 64
+#define SEGMENT_SIZE 32
 
 ///////////////////////////////////////////////////////////////////////////////
 //
@@ -27,7 +27,7 @@ __global__ void scalarProd(float *C, const float *A, const float *B, int nElem) 
 		- block_idx.x = index of the block (the block of threads) inside the grid (the number of blocks that we have)
 		- blockDim.x = the number of threads inside the block
 		-*/
-	int threadIdGrid = thread_Idx.x + block_idx.x * blockDim.x;
+	int threadIdGrid = threadIdx.x + blockIdx.x * blockDim.x;
 	/*The shared memory btw threads that we are going to use to store the partial results*/
 	extern __shared__ float sharedMem[];
 	/* We need to store that partial results in this variable bc we have to add each partial sum (thread_sum_result) */
@@ -39,7 +39,7 @@ __global__ void scalarProd(float *C, const float *A, const float *B, int nElem) 
 		thread_sum_result = A[threadIdGrid] * B [threadIdGrid];
 	}
 	/*Here we have to store the sum result in the thread index position because is just the prooduct of index X in bouth matrix */
-	sharedMem[threadId.x] = thread_sum_result;
+	sharedMem[threadIdx.x] = thread_sum_result;
 	/*We must synchornize the threads to get sure that all the threats've finished their calculatons*/
 	__syncthreads();
 	/* Here we have to reduce the partials sums into the 0 position of the shared mem btw threads bc this thread will dump the results into the global mem*/
@@ -47,7 +47,7 @@ __global__ void scalarProd(float *C, const float *A, const float *B, int nElem) 
 	/*Secuential mode*/
 	for (int i = 1; i< blockDim.x; i++)
 	{
-		shareadMem[threadId.x] += sharedMem[i];
+		sharedMem[threadIdx.x] += sharedMem[i];
 		__syncthreads();
 	}
 	/*This is the binary mode for the reduction
@@ -66,7 +66,7 @@ __global__ void scalarProd(float *C, const float *A, const float *B, int nElem) 
 		}
 	*/
 	/* The first thread of the block is in charge of write the data into de C matrix (is like the global mem for this function)*/
-	if(threadId.x == 0)
+	if(threadIdx.x == 0)
 	{
 		atomicAdd(C,sharedMem[0]);
 	}
@@ -85,10 +85,10 @@ __global__ void vectorReduce(float *R, const float *C, int nElem)
     extern __shared__ float sdata[];
 	/*For this part we need have bouth id the local in the block (threadLocalID) and the id on the grid (threadGlobalID) bc
 	we have to paralelze the data and cpy from the local mem to the global mem (o surprise the C MATRIX)*/
-	int threadLocalId = threadId.x;
-	int threadGlobalId = threadId.x + blockId.x*blockDim.x;
+	int threadLocalId = threadIdx.x;
+	int threadGlobalId = threadIdx.x + blockIdx.x * blockDim.x;
 	/*Dump the data from the C matrix into the shared memory we do this for efficency, is fastest access into the shared memory that have to acces into a matrix*/
-	if(threadGlobalId< neElem)
+	if(threadGlobalId< nElem)
 	{
 		sdata[threadLocalId] = C[threadGlobalId];
 	}
@@ -164,9 +164,9 @@ int main( void ) {
 	size_t n_bytes = (n_elem * sizeof(float));
 	
 	// Allocate Host Memory
-	float *h_A = (float *) malloc( &h_A, n_bytes );
-	float *h_B = (float *) malloc( &h_B, n_bytes );
-	float *h_R = (float *) malloc( &h_R, n_bytes );
+	float *h_A = (float *) malloc(n_bytes );
+	float *h_B = (float *) malloc(n_bytes );
+	float *h_R = (float *) malloc(n_bytes );
 		
 	// Initialize Host Data
 	srand(123);
@@ -209,8 +209,6 @@ int main( void ) {
 	/*So here i just cpy the matrix into the graphic and we dont have to syncronyze bc cpy is a blocking op  */
 	cudaMemcpy(d_A, h_A, n_bytes, cudaMemcpyHostToDevice);
 	cudaMemcpy(d_B, h_B, n_bytes, cudaMemcpyHostToDevice);
-	cudaMemcpy(d_C, h_C, n_bytes, cudaMemcpyHostToDevice);
-	cudaMemcpy(d_R, h_R, n_bytes, cudaMemcpyHostToDevice);
 
 	/*Here we invoke the function for calculate de scalarProduct
 	scalarProd<<<numberOfBlocks, Block Dimension>>>(RESULT,MATRIX1, MATRIXB, numberOfElements); */
@@ -221,7 +219,7 @@ int main( void ) {
 	
 	// Copy Device Data to Host
 	/*Here i have to use cudaMemCpy->cudaMemcpy(destination, source, size, cudaMemcpyDeviceToHost);*/
-	cuda_memcpy(h_R, d_R, n_bytes, cudaMemcpyDeviceToHost)
+	cudaMemcpy(h_R, d_R, n_bytes, cudaMemcpyDeviceToHost);
 	
 	
 	
