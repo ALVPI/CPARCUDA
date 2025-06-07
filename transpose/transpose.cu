@@ -26,13 +26,19 @@ __global__ void transposeMatrix(float *d_data, int mat_dim) {
 	// Array in Shared Memory
 	extern __shared__ float sdata[];
 	
-	int tid_b = threadx.x;
-	int tid_g = threadx.x + blockIdx.x * blockDim.x;
+	int tid_b = threadIdx.x;
+	int tid_g = threadIdx.x + blockIdx.x * blockDim.x;
+	/*In this case we dump the data from the global memory into the local bc we have to calculate in the local memory de index in the transpose matrix*/
 	for (int i=0; i < blockDim.x; i++) {
 		sdata[tid_b] = d_data[tid_g];
 	}
-	
 	__syncthreads();
+	/*Index of the element in the transpose matrix*/
+	int transposedIndex = tid_b * mat_dim + blockIdx.x; 
+	/*Dump the data from the local memory into de global memory*/
+	if (tid_g < mat_dim) {
+		d_data[transposedIndex] = sdata[tid_b];
+	}
 }
 
 // ---------------------
