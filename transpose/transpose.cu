@@ -25,16 +25,19 @@ __global__ void transposeMatrix(float *d_data, int mat_dim) {
 
 	// Array in Shared Memory
 	extern __shared__ float sdata[];
-	
+	/*tid_b is the idex of the thread inside the block*/
+	/*tid_g is the index of the thread in the global memory*/
 	int tid_b = threadIdx.x;
 	int tid_g = threadIdx.x + blockIdx.x * blockDim.x;
 	/*In this case we dump the data from the global memory into the local bc we have to calculate in the local memory de index in the transpose matrix*/
-	for (int i=0; i < blockDim.x; i++) {
-		sdata[tid_b] = d_data[tid_g];
-	}
+
+	sdata[tid_b] = d_data[tid_g];
+	
 	__syncthreads();
 	/*Index of the element in the transpose matrix*/
-	int transposedIndex = tid_b * mat_dim + blockIdx.x; 
+	/*A[i][j] must b A^t[j][i] that's my goal*/
+	/*So the trans index will be the block index*matrix's dimension + the local index of the thread inside of the block*/
+	int transposedIndex =  tid_b * mat_dim + blockIdx.x; 
 	/*Dump the data from the local memory into de global memory*/
 	if (tid_g < mat_dim) {
 		d_data[transposedIndex] = sdata[tid_b];
@@ -104,9 +107,9 @@ int main( void ) {
 	float kernel_time, kernel_bandwidth;
 	
 	// Allocate Device Memory
-	float *device_A, *device_AT;
-	cudaMalloc((void**)&device_A, dim_x * dim_y);
-	cudaMalloc((void**)&device_AT,dim_x * dim_y);
+	float *d_data;
+	cudaMalloc((void**)&d_data, dim_x * dim_y);
+
 	// Init Events
 	cudaEventCreate(&start);
 	cudaEventCreate(&stop );
@@ -115,14 +118,14 @@ int main( void ) {
     cudaEventRecord(start, 0);
 	
 	// Copy Host Data to Device
-	cudaMemcpy(device_A, A, n_bytes, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_data, A, n_bytes, cudaMemcpyHostToDevice);
 	
 	
-    transposeMatrix<<<n_block, block_dim, block_dim*sizeof(float) >>>(device_A, dim_x);
+    transposeMatrix<<<n_block, block_dim, block_dim*sizeof(float) >>>(d_data, dim_x);
 	cudaDeviceSynchronize();
 	// Copy Device Data to Host
 	
-	cudaMemCpy(Aux, device_A, n_bytes, cudaMemcpyDeviceToHost);
+	cudaMemcpy(Aux, d_data, n_bytes, cudaMemcpyDeviceToHost);
     
 	// End Time Measurement
 	cudaEventRecord(stop, 0);
