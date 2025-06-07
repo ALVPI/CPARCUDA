@@ -68,7 +68,7 @@ __global__ void scalarProd(float *C, const float *A, const float *B, int nElem) 
 	/* The first thread of the block is in charge of write the data into de C matrix (is like the global mem for this function)*/
 	if(threadId.x == 0)
 	{
-		C[blockId.x] = sharadMem[0];
+		atomicAdd(C,sharedMem[0]);
 	}
 
 
@@ -118,7 +118,7 @@ __global__ void vectorReduce(float *R, const float *C, int nElem)
 	/* The first thread of the block is in charge of write the data into de C matrix (is like the global mem for this function)*/
 	if(threadLocalId == 0)
 	{
-		R[blockIdx.x] = sdata[0];
+		atomicAdd(R, sdata[0]);
 	}
 
 
