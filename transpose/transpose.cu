@@ -25,20 +25,17 @@ __global__ void transposeMatrix(float *d_data, int mat_dim) {
 
 	// Array in Shared Memory
 	extern __shared__ float sdata[];
-	/*tid_b is the idex of the thread inside the block*/
-	/*tid_g is the index of the thread in the global memory*/
-	int tid_b = threadIdx.x;
-	int tid_g = threadIdx.x + blockIdx.x * blockDim.x;
+	int index_in, index_out, i, j, local_idx;
 	/*This are the index of out cell in the GLOBAL MEMORY*/
-	/*Pues de puta madre soy gilipollas y sólo dumpeo una celda de la matriz aaaaaaaaa*/
-	int i = blockIdx.x * blockDim.x + threadIdx.x;
-	int j = blockIdx.y * blockDim.y + threadIdx.y;
+	i = blockIdx.x * blockDim.x + threadIdx.x;
+	j = blockIdx.y * blockDim.y + threadIdx.y;
 	/*He are going to need this for the trans relation of the initial index*/
-    int index_in  = j * mat_dim + i;
-    int index_out = i * mat_dim + j;
-	if(x < mat_dim && j < mat_dim)
+	if(i < mat_dim && j < mat_dim)
 	{
-		int local_idx = threadIdx.y * blockDim.x + threadIdx.x;
+		index_in  = j * mat_dim + i;
+		local_idx = threadIdx.y * blockDim.x + threadIdx.x;
+		/*We dump the mem into the local shared mem from the global mem
+		that means that we are going to move the element for the matrix into the local mem that is shared with all the threads of the block*/
         sdata[local_idx] = d_data[index_in];
 	}
 	__syncthreads();
@@ -48,6 +45,7 @@ __global__ void transposeMatrix(float *d_data, int mat_dim) {
 	Then we store in the matrix (the result of the transposition) position the data of the global memory of this block (for his threads)
 	sdata[Column* xDimension of the block +the local index of the thread]*/
 	if (i < mat_dim && j < mat_dim) {
+		index_out = i * mat_dim + j;
         d_data[index_out] = sdata[threadIdx.y * blockDim.x + threadIdx.x];
     }
 }
