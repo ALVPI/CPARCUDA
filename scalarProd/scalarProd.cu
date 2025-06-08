@@ -55,11 +55,11 @@ __global__ void scalarProd(float *C, const float *A, const float *B, int nElem) 
 		//We have the "row"/2, we check that s > 0 and in each iteration we divide s/2*/
 	for (int s = blockDim.x / 2; s > 0; s >>= 1)
 	{
-		/*This if is the key of everything, with each itearion we are going to have less threadts*/
-		so, we are going to have the first half of the threads as a results accumulator//
-		if(threadId.x < s)
+		/*This if is the key of everything, with each itearion we are going to have less threadts
+		so, we are going to have the first half of the threads as a results accumulator*/
+		if(threadIdx.x < s)
 		{
-			sharedMem[threadId.x] += sharedMem[threadId.x + s];
+			sharedMem[threadIdx.x] += sharedMem[threadIdx.x + s];
 		}
 		/*sync the mem bc we have to be sure that each op was done*/
 		__syncthreads();

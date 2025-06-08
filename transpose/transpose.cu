@@ -25,30 +25,36 @@ __global__ void transposeMatrix(float *d_data, int mat_dim) {
 
 	// Array in Shared Memory
 	extern __shared__ float sdata[];
-	int index_in, index_out, i, j, local_idx;
-	/*This are the index of out cell in the GLOBAL MEMORY*/
-	i = blockIdx.x * blockDim.x + threadIdx.x;
-	j = blockIdx.y * blockDim.y + threadIdx.y;
-	/*He are going to need this for the trans relation of the initial index*/
+	/*This are the index of each cell in the GLOBAL MEMORY (d_data)*/
+	int i, j;
+	j = blockIdx.x * blockDim.x + threadIdx.x;
+	i = blockIdx.y * blockDim.y + threadIdx.y;
+	/*This are the local coords of the thread threadIdx.x & threadIdx.y
+	int tid_b = j;
+	int tid_g = j * mat_dim + i;*/
+	/*Now we have to dump the mem for the global memory into the shared local mem*/
 	if(i < mat_dim && j < mat_dim)
-	{
-		index_in  = j * mat_dim + i;
-		local_idx = threadIdx.y * blockDim.x + threadIdx.x;
-		/*We dump the mem into the local shared mem from the global mem
-		that means that we are going to move the element for the matrix into the local mem that is shared with all the threads of the block*/
-        sdata[local_idx] = d_data[index_in];
+	{	
+		/*i*mat_dim+j-> the traditional form of take the transpose position:
+		bc is row*(row*col)+ column*/
+		sdata[threadIdx.y * blockDim.x + threadIdx.x] = d_data[i*mat_dim+j];
 	}
+	/*We must wait untill each thread had taken their data*/
 	__syncthreads();
 	/*Index of the element in the transpose matrix*/
-	/*A[i][j] must b A^t[j][i] that's my goal*/
-	/*So first we need to check that our position in the original matrix is valid
-	Then we store in the matrix (the result of the transposition) position the data of the global memory of this block (for his threads)
-	sdata[Column* xDimension of the block +the local index of the thread]*/
-	if (i < mat_dim && j < mat_dim) {
-		index_out = i * mat_dim + j;
-        d_data[index_out] = sdata[threadIdx.y * blockDim.x + threadIdx.x];
-    }
+	int iT, jT;
+	iT = blockIdx.x * blockDim.x + threadIdx.y;
+	jT = blockIdx.y * blockDim.y + threadIdx.x;
+	/*A[i][j] must b A[iT][jT] that's my goal*/
+	/*So first we need to check that our position in the original matrix is valid*/
+	if( iT < mat_dim && jT < mat_dim)
+	{		
+		/*we dumt the transpose data into the matrix (d_data)*/
+		/*jT*mat_dim +iT-> the traditional form of having the transpose position*/
+		d_data[jT * mat_dim + iT] = sdata[threadIdx.x * blockDim.y + threadIdx.y];
+	}
 }
+	
 
 // ---------------------
 // Host Utility Routines
