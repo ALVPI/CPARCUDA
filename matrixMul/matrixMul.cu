@@ -28,16 +28,54 @@ __global__ void transposeMatrix(float *d_data, int mat_dim) {
 }
 
 __global__ void scalarProd(float *C, const float *A, const float *B, int nElem) {
-
-	// COMPLETAR...
+	int threadID = blockIdc.c * blockDim.x + threadIdx.x;
+	if (tid< nElem)
+	{
+		C[threadId]= A[threadID]* B[threadID];
+	}
 }
 
 __global__ void vectorReduce(float *R, const float *C, int nElem)
 {
 	// Array in Shared Memory
     extern __shared__ float sdata[];
-	
-	// COMPLETAR...
+	/*For this part we need have bouth id the local in the block (threadLocalID) and the id on the grid (threadGlobalID) bc
+	we have to paralelze the data and cpy from the local mem to the global mem (o surprise the C MATRIX)*/
+	int threadLocalId = threadIdx.x;
+	int threadGlobalId = threadIdx.x + blockIdx.x * blockDim.x;
+	/*Dump the data from the C matrix into the shared memory we do this for efficency, is fastest access into the shared memory that have to acces into a matrix*/
+	if(threadGlobalId< nElem)
+	{
+		sdata[threadLocalId] = C[threadGlobalId];
+	}
+	/*Sync bc we have to be sure that each thread dump the data into the shared mem*/
+	__syncthreads();
+	/*Secuential mode-> i used this code as a reference for checking if it works properly
+	for (int i = 1; i< blockDim.x; i++)
+	{
+		sdata[threadLocalId] += sdata[i];
+		__syncthreads();
+	}*/
+	/*This is the binary mode for the reduction
+	We are going to use a binary reduction, bc is the easiest way of do what we need
+	We have the "row"/2, we check that s > 0 and in each iteration we divide s/2*/
+	for (int s = blockDim.x / 2; s > 0; s >>= 1)
+	{
+		/*This if is the key of everything, with each itearion we are going to have less threadts
+		so, we are going to have the first half of the threads as a results accumulator*/
+		if(threadLocalId < s)
+		{
+			sdata[threadLocalId] += sdata[threadLocalId + s];
+		}
+		/*sync the mem bc we have to be sure that each op was done*/
+		__syncthreads();
+	}
+
+	/* The first thread of the block is in charge of write the data into de C matrix (is like the global mem for this function)*/
+	if(threadLocalId == 0)
+	{
+		atomicAdd(R, sdata[0]);
+	}
 }
 
 // ---------------------
@@ -118,8 +156,10 @@ int main( void ) {
 	-h_R the memory zone where is store the result matrix */
 	float *h_A, *h_B, *h_C, *h_R;
 	/*Malloc for have the psbly of store each matrix */
-	
-	
+	*h_A =malloc (n_bytes*sizeof(float));
+	*h_B =malloc (n_bytes*sizeof(float));
+	*h_C =malloc (n_bytes*sizeof(float));
+	*h_R =malloc (n_bytes*sizeof(float));
 	// Initialize Host Data
 	srand(123);
 	
@@ -144,7 +184,11 @@ int main( void ) {
 	// Allocate Device Memory
 	float *d_A, *d_B, *d_C;
 	
-	// COMPLETAR...	
+	cudaMalloc(&d_A, n_bytes);
+	cudaMalloc(&d_B, n_bytes);
+	cudaMalloc(&d_C, n_bytes);
+
+
 
 	// CUDA Events
 	cudaEvent_t start, stop;
@@ -157,27 +201,31 @@ int main( void ) {
     cudaEventRecord(start, stream);
 	
 	// Copy Host Data to Device
-	
-	// COMPLETAR...	
+	cudaMemcpy(d_A, h_A, n_bytes, cudaMemcpyHostToDevice);
+	cudaMemcpy(d_B, h_B, n_bytes, cudaMemcpyHostToDevice);
 	
 	cudaStreamSynchronize(stream);
-	
-	transposeMatrix<<< // COMPLETAR... >>>( // COMPLETAR... );
+	/*This is the invocation from transpose.cu
+	transposeMatrix<<<n_block, block_dim, block_dim*sizeof(float) >>>(d_data, dim_x);*/
+	transposeMatrix<<<n_block, block_dim, block_dim*sizeof(float)>>>(d_B, dim_x);
 
 	cudaStreamSynchronize(stream);
 
 	for(int i = 0; i < dim_y; i++) {
 		for(int j = 0; j < dim_x; j++) {
-			scalarProd<<< // COMPLETAR... >>> (  // COMPLETAR... );
+			/*This is the invocation from scalarProd.cu
+			scalarProd<<<n_block, block_dim>>>(d_C, d_A, d_B, n_elem);*/
+			scalarProd<<<n_block, block_dim>>> (d_C,d_A, d_B, mat_size);
 			cudaStreamSynchronize(stream);
-			vectorReduce<<< // COMPLETAR... >>>( // COMPLETAR... );
+			/*vectorReduce<<<1, block_dim, block_dim*sizeof(float) >>>(d_R, d_C, n_elem);*/
+			vectorReduce<<<1,block:dim, block_dim*sizeof(float)>>>(d_R, d_c, mat_size);
 		}
 	}
 	cudaDeviceSynchronize();
 	
 	// Copy Device Data to Host
 
-	// COMPLETAR...	
+	cudaMemcpy(d_R, h_R, n_bytes, cudaMemcpyDeviceToHost);
 	
 	cudaStreamSynchronize(stream);
 	
@@ -200,10 +248,16 @@ int main( void ) {
 	}
 	
 	// Free Host Memory
-	// COMPLETAR...
+	free(h_A);
+	free(h_B);
+	free(h_C);
+	free(h_D);
 	
 	// Free Device Memory
-	// COMPLETAR...
+	cudaFree(d_A);
+	cudaFree(d_B);
+	cudaFree(d_C);
+	cudaFree(d_R);
 	
 	// Destroy Events
 	cudaEventDestroy(start);
