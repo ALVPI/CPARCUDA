@@ -44,27 +44,27 @@ __global__ void scalarProd(float *C, const float *A, const float *B, int nElem) 
 	__syncthreads();
 	/* Here we have to reduce the partials sums into the 0 position of the shared mem btw threads bc this thread will dump the results into the global mem*/
 
-	/*Secuential mode*/
+	/*Secuential mode
 	for (int i = 1; i< blockDim.x; i++)
 	{
 		sharedMem[threadIdx.x] += sharedMem[i];
 		__syncthreads();
-	}
+	}*/
 	/*This is the binary mode for the reduction
 		// We are going to use a binary reduction, bc is the easiest way of do what we need
-		//We have the "row"/2, we check that s > 0 and in each iteration we divide s/2
-		for (int s = blockDim.x / 2; s > 0; s >>= 1)
+		//We have the "row"/2, we check that s > 0 and in each iteration we divide s/2*/
+	for (int s = blockDim.x / 2; s > 0; s >>= 1)
+	{
+		/*This if is the key of everything, with each itearion we are going to have less threadts*/
+		so, we are going to have the first half of the threads as a results accumulator//
+		if(threadId.x < s)
 		{
-			//This if is the key of everything, with each itearion we are going to have less threadts
-			so, we are going to have the first half of the threads as a results accumulator//
-			if(threadId.x < s)
-			{
-				sharedMem[threadId.x] += sharedMem[threadId.x + s];
-			}
-			//sync the mem bc we have to be sure that each op was done
-			__syncthreads();
+			sharedMem[threadId.x] += sharedMem[threadId.x + s];
 		}
-	*/
+		/*sync the mem bc we have to be sure that each op was done*/
+		__syncthreads();
+	}
+
 	/* The first thread of the block is in charge of write the data into de C matrix (is like the global mem for this function)*/
 	if(threadIdx.x == 0)
 	{
