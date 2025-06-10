@@ -21,40 +21,42 @@
 // Computes the Transpose of a Matrix
 //
 ///////////////////////////////////////////////////////////
-__global__ void transposeMatrix(float *d_data, int mat_dim) {
+__global__ void transposeMatrix(float *out_data, float *d_data, int mat_dim) {
 
-	//We have to get the i and j local for the block 
-	// Array in Shared Memory
-	extern __shared__ float sdata[];
-	/*This are the index of each cell in the GLOBAL MEMORY (d_data)*/
-	int i, j;
-	j = blockIdx.x * blockDim.x + threadIdx.x;
-	i = blockIdx.y * blockDim.y + threadIdx.y;
-	/*This are the local coords of the thread threadIdx.x & threadIdx.y
-	int tid_b = j;
-	int tid_g = j * mat_dim + i;*/
-	//El indice local del bloque de los hilos porque la shared es el ámbito local de hilo 
-	/*Now we have to dump the mem for the global memory into the shared local mem*/
-	if(i < mat_dim && j < mat_dim)
-	{	
-		/*i*mat_dim+j-> the traditional form of take the transpose position:
-		bc is row*(row*col)+ column*/
-		sdata[threadIdx.y * blockDim.x + threadIdx.x] = d_data[i*mat_dim+j];
-	}
-	/*We must wait untill each thread had taken their data*/
-	__syncthreads();
-	/*Index of the element in the transpose matrix*/
-	int iT, jT;
-	iT = blockIdx.x * blockDim.x + threadIdx.y;
-	jT = blockIdx.y * blockDim.y + threadIdx.x;
-	/*A[i][j] must b A[iT][jT] that's my goal*/
-	/*So first we need to check that our position in the original matrix is valid*/
-	if( iT < mat_dim && jT < mat_dim)
-	{		
-		/*we dumt the transpose data into the matrix (d_data)*/
-		/*jT*mat_dim +iT-> the traditional form of having the transpose position*/
-		d_data[jT * mat_dim + iT] = sdata[threadIdx.x * blockDim.y + threadIdx.y];
-	}
+        //We have to get the i and j local for the block 
+        // Array in Shared Memory
+        extern __shared__ float sdata[];
+        /*This are the index of each cell in the GLOBAL MEMORY (d_data)*/
+        int i, j, tid_block, tid_blockTras;
+        j = blockIdx.x * blockDim.x + threadIdx.x;
+        i = blockIdx.y * blockDim.y + threadIdx.y;
+        tid_block = threadIdx.y*blockDim.x+threadIdx.x;
+        tid_blockTras = threadIdx.x*blockDim.y+threadIdx.y;
+        /*This are the local coords of the thread threadIdx.x & threadIdx.y
+        int tid_b = j;
+        int tid_g = j * mat_dim + i;*/
+        //El indice local del bloque de los hilos porque la shared es el ámbito local de hilo 
+        /*Now we have to dump the mem for the global memory into the shared local mem*/
+        if(i < mat_dim && j < mat_dim)
+        {
+                /*i*mat_dim+j-> the traditional form of take the transpose position:
+                bc is row*(row*col)+ column*/
+                sdata[tid_block] = d_data[i*mat_dim+j];
+        }
+        /*We must wait untill each thread had taken their data*/
+        __syncthreads();
+        /*Index of the element in the transpose matrix*/
+        int iT, jT;
+        iT = blockIdx.x * blockDim.x + threadIdx.y;
+        jT = blockIdx.y * blockDim.y + threadIdx.x;
+        /*A[i][j] must b A[iT][jT] that's my goal*/
+        /*So first we need to check that our position in the original matrix is valid*/
+        if( iT < mat_dim && jT < mat_dim)
+        {
+                /*we dumt the transpose data into the matrix (d_data)*/
+                /*jT*mat_dim +iT-> the traditional form of having the transpose position*/
+                out_data[iT * mat_dim + jT] = sdata[tid_blockTras];
+        }
 }
 	
 
@@ -122,7 +124,9 @@ int main( void ) {
 	
 	// Allocate Device Memory
 	float *d_data;
-	cudaMalloc((void**)&d_data, dim_x * dim_y);
+	cudaMalloc(&d_data, dim_x * dim_y*sizeof(float));
+	float *out_data;
+	cudaMalloc(&out_data, dim_x * dim_y*sizeof(float));
 
 	// Init Events
 	cudaEventCreate(&start);
@@ -133,14 +137,15 @@ int main( void ) {
 	
 	// Copy Host Data to Device
 	cudaMemcpy(d_data, A, n_bytes, cudaMemcpyHostToDevice);
-	
-	
+
+	//transposeMatrix<<<gridSize, blockSize, tamShared>>>(param)
+	transposeMatrix<<<blocksPerGrid, threadsPerBlock, n_bytes>>>(out_data, d_data, dim_x);
      
 	cudaDeviceSynchronize();
 	// Copy Device Data to Host
 	
-	cudaMemcpy(Aux, d_data, n_bytes, cudaMemcpyDeviceToHost);
-    
+	cudaMemcpy(Aux, out_data, n_bytes, cudaMemcpyDeviceToHost);
+
 	// End Time Measurement
 	cudaEventRecord(stop, 0);
 	cudaEventSynchronize(stop);
