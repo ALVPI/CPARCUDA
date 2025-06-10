@@ -23,6 +23,7 @@
 ///////////////////////////////////////////////////////////
 __global__ void transposeMatrix(float *d_data, int mat_dim) {
 
+	//We have to get the i and j local for the block 
 	// Array in Shared Memory
 	extern __shared__ float sdata[];
 	/*This are the index of each cell in the GLOBAL MEMORY (d_data)*/
@@ -32,6 +33,7 @@ __global__ void transposeMatrix(float *d_data, int mat_dim) {
 	/*This are the local coords of the thread threadIdx.x & threadIdx.y
 	int tid_b = j;
 	int tid_g = j * mat_dim + i;*/
+	//El indice local del bloque de los hilos porque la shared es el ámbito local de hilo 
 	/*Now we have to dump the mem for the global memory into the shared local mem*/
 	if(i < mat_dim && j < mat_dim)
 	{	
@@ -133,7 +135,7 @@ int main( void ) {
 	cudaMemcpy(d_data, A, n_bytes, cudaMemcpyHostToDevice);
 	
 	
-    transposeMatrix<<<n_block, block_dim, block_dim*sizeof(float) >>>(d_data, dim_x);
+     
 	cudaDeviceSynchronize();
 	// Copy Device Data to Host
 	

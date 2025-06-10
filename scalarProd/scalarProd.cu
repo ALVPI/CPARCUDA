@@ -247,7 +247,7 @@ int main( void ) {
 	cudaEventDestroy(start);
 	cudaEventDestroy(stop);
 	
-	if (result_cpu != result_cpu) {
+	if (result_gpu != result_cpu) {
 		printf("Test Failed!\n");
 		exit(EXIT_FAILURE);
 	}
